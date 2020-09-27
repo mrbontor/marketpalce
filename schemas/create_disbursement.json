@@ -1,0 +1,98 @@
+{
+    "title": "Validator of disbursement",
+    "required": [
+        "uuid",
+        "username",
+        "data"
+    ],
+    "properties": {
+        "uuid": {
+            "title": "A string value",
+            "default": "",
+            "format": "uuid",
+            "examples": [
+                "97ca156e-0374-4e00-86c6-5ce8af564b70"
+            ],
+            "$id": "#/properties/uuid",
+            "type": "string"
+        },
+        "username": {
+            "title": "A string value",
+            "default": "",
+            "pattern": "^(.*)$",
+            "examples": [
+                "progre"
+            ],
+            "$id": "#/properties/username",
+            "type": "string"
+        },
+        "data": {
+            "title": "An object value",
+            "required": [
+                "transaction"
+            ],
+            "properties": {
+                "transaction": {
+                    "title": "An object value",
+                    "required": [
+                        "bank_code",
+                        "account_number",
+                        "amount"
+                    ],
+                    "properties": {
+                        "account_number": {
+                            "title": "A string value",
+                            "default": "",
+                            "pattern": "^(.*)$",
+                            "examples": [
+                                "525101007461538"
+                            ],
+                            "$id": "#/properties/data/properties/transaction/properties/account_number",
+                            "type": "string"
+                        },
+                        "bank_code": {
+                            "title": "A string value",
+                            "default": "",
+                            "pattern": "^(.*)$",
+                            "examples": [
+                                "bri"
+                            ],
+                            "$id": "#/properties/data/properties/transaction/properties/bank_code",
+                            "type": "string"
+                        },
+                        "amount": {
+                            "title": "An Number value",
+                            "default": 10000,
+                            "minimum": 10000,
+                            "maximum": 3000000,
+                            "pattern": "^(\\d+)$",
+                            "examples": [
+                                10000
+                            ],
+                            "$id": "#/properties/data/properties/transaction/properties/amount",
+                            "type": "number"
+                        },
+                        "remark": {
+                            "title": "A string value",
+                            "default": "",
+                            "pattern": "^(.*)$",
+                            "examples": [
+                                "transfer cashback"
+                            ],
+                            "$id": "#/properties/data/properties/transaction/properties/remark",
+                            "type": "string"
+                        }
+                    },
+                    "$id": "#/properties/data/properties/transaction",
+                    "type": "object"
+                }
+            },
+            "$id": "#/properties/data",
+            "type": "object"
+        }
+    },
+    "$id": "http://example.org/create_disbursement.json#",
+    "type": "object",
+    "definitions": {},
+    "$schema": "http://json-schema.org/draft-07/schema#"
+}
