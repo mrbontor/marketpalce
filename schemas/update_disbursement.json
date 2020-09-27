@@ -1,7 +1,6 @@
 {
     "title": "Validator of disbursement",
     "required": [
-        "uuid",
         "username",
         "data"
     ],
@@ -21,7 +20,7 @@
             "default": "",
             "pattern": "^(.*)$",
             "examples": [
-                "progre"
+                "mrbontor"
             ],
             "$id": "#/properties/username",
             "type": "string"

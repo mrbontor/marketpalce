@@ -3,9 +3,9 @@ const Ajv = require('ajv');
 const iniParser = require('../libs/iniParser')
 const logging = require('../libs/logging')
 const util = require('../libs/utils')
-const request = require('./needleRequest')
+const api = require('./flipApi')
 
-const createDisbursement    = JSON.parse(fs.readFileSync('./schemas/create_disbursement.json'))
+const createDisbursement = JSON.parse(fs.readFileSync('./schemas/create_disbursement.json'))
 
 let config = iniParser.get()
 //show All error if data not valid
@@ -16,17 +16,18 @@ const ajv = new Ajv({
 
 
 const SUCCESSS          = 200
-const ACCESS_FORBIDDEN  = 403
+const BAD_REQUEST       = 400
+const UNAUTHORIZED      = 401
 const NOT_FOUND         = 404
 const INTERNAL_ERROR    = 500
 
 async function create_disbursement(req, res) {
     let respons = {status: false, message: "Failed"}
     try {
-        let _request = formatRequest(req.body)
-        logging.debug(`[IN][REQUEST][BODY] >>>> ${JSON.stringify(_request)}`)
+        let _request = req.body
+        logging.debug(`[PAYLOAD] >>>> ${JSON.stringify(_request.data.transaction)}`)
 
-        let isRequestValid = await createRequesTrx(_request)
+        let isRequestValid = await createRequestDisburse(_request)
         logging.debug(`[isRequestValid] >>>> TRUE =>FALSE || FALSE => TRUE ${JSON.stringify(isRequestValid)}`)
 
         if (isRequestValid.message){
@@ -34,10 +35,25 @@ async function create_disbursement(req, res) {
             return res.status(SUCCESS).send(respons);
         }
 
+        let transfer = await api.transfer(_request.data.transaction)
+        logging.debug(`[tranferBankAccoount]   >>>>> ${JSON.stringify(transfer)}`)
+
+        if (transfer.status !== 200) {
+            respons.message = transfer.message
+            return res.status(BAD_REQUEST).send(respons);
+        }
+
+        // if (transfer.errors) {
+        //     respons.errors = transfer.errors
+        //     return res.status(BAD_REQUEST).send(respons);
+        // }
+
+        respons.status = true
+        respons.data = transfer
         res.status(SUCCESSS).send(respons)
     } catch (e) {
         logging.debug(`[create_disbursement][Err]   >>>>> ${e.stack}`)
-        res.status(SUCCESS).send(respons)
+        res.status(INTERNAL_ERROR).send(respons)
     }
 }
 
@@ -45,7 +61,7 @@ function get_detail_disbursement(req, res) {
     res.status(SUCCESSS)
 }
 
-async function createRequesDisburse(request) {
+async function createRequestDisburse(request) {
     let result = {}
     let valid = ajv.validate(createDisbursement, request);
 

@@ -1,6 +1,6 @@
 const express = require('express')
 const fs = require('fs');
-const uuid          = require('uuid').v4
+const uuid = require('uuid').v4
 const iniParser = require('./libs/iniParser')
 const logging = require('./libs/logging')
 const args = require('minimist')(process.argv.slice(2));

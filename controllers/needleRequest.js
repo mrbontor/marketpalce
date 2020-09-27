@@ -1,11 +1,12 @@
 const needle        = require('needle')
-const iniParser     = require('../libs/iniParser');
-const logging       = require('../libs/logging');
-const { genReff }   = require('../libs/utils')
+const iniParser = require('../libs/iniParser')
+const logging = require('../libs/logging')
+const {genReff} = require('../libs/utils')
 
+let config = iniParser.get()
 
 async function api(method, url, payload, options={}) {
-    let baseUrl = config.flipid.url + url
+    let baseUrl = config.flipapi.url + url
     let reff = genReff()
     options.json = options.json === undefined ? true : options.json
     options.compressed = true

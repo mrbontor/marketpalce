@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 function handleErrorValidation(array) {
     return array.reduce((obj, item) => (obj['message'] = {field: item.dataPath, message: `${item.dataPath} ` +item.message}, obj) ,{});
 }
