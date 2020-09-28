@@ -4,7 +4,7 @@ module.exports = function(app) {
     app.route('/api/flip/disbursement/create')
         .post(router.create_disbursement)
 
-    app.route('/api/flipid/disbursement/id/:id')
+    app.route('/api/flip/disbursement/id/:id')
         .get(router.get_detail_disbursement)
 
     app.get('/api/flip/ping', function (req, res) {

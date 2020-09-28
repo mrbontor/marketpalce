@@ -16,24 +16,11 @@ const req_header = {
 }
 
 async function transfer(data) {
-    let payload = {
-        uuid: data.uuid || uuid(),
-        username: data.username,
-        data: {
-            transaction: {
-                account_number: data.account_number,
-                bank_code: data.bank_code,
-                amount: parseInt(data.amount),
-                remark: data.remark
-            }
-        }
-    }
-
     let options = {
         headers: req_header
     }
 
-    let result = await request('POST', URL_DISBURSEMENT, payload, options)
+    let result = await request('POST', URL_DISBURSEMENT, data, options)
     if ( null === result) {
         return null
     }
@@ -41,6 +28,21 @@ async function transfer(data) {
     return result
 }
 
+async function detail(data) {
+    let options = {
+        headers: req_header
+    }
+
+    let result = await request('GET', URL_CHECK_STATUS + data, {}, options)
+    if ( null === result) {
+        return null
+    }
+
+    return result
+}
+
+
 module.exports = {
-    transfer
+    transfer,
+    detail
 };

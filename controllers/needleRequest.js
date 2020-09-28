@@ -5,22 +5,18 @@ const {genReff} = require('../libs/utils')
 
 let config = iniParser.get()
 
-async function api(method, url, payload, options={}) {
+function apiRequest(method, url, data, options={}){
     let baseUrl = config.flipapi.url + url
     let reff = genReff()
-    options.json = options.json === undefined ? true : options.json
-    options.compressed = true
-    options.open_timeout = 30000
-    options.read_timeout = 60000
+    logging.http(`[FLIP-API][REQ][OUT] REFF: ${reff} ${method} ${baseUrl} ${JSON.stringify(data)} ${JSON.stringify(options)}`)
+    return new Promise(function(resolve, reject) {
+        needle.request(method, baseUrl, data, options, function(err, resp, body) {
+            logging.http(`[FLIP-API][RES][IN] REFF: ${reff} ${resp.statusCode} ${JSON.stringify(body)}`)
+            if (undefined === body) reject(null)
 
-    let res =  await needle(method, baseUrl, payload, options)
-
-    logging.http(`[FLIP-ID][REQ][OUT] REFF: ${reff} ${method} ${baseUrl} ${JSON.stringify(payload)} ${JSON.stringify(options)}`)
-    logging.http(`[FLIP-ID][RES][IN] REFF: ${reff} ${res.statusCode} ${JSON.stringify(res.body)}`)
-
-    if (undefined === res.body) return null
-
-    return res.body
+            resolve(body)
+        });
+    });
 }
 
-module.exports = api;
+module.exports = apiRequest;
