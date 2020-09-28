@@ -7,6 +7,8 @@ const args = require('minimist')(process.argv.slice(2));
 const bodyParser = require('body-parser')
 const app = express()
 
+const mongo = require('./libs/mongo')
+
 const NODE_ENV = process.env.NODE_ENV
 process.env.TZ = 'Asia/Jakarta'
 
@@ -25,7 +27,16 @@ let config = {
     },
     flipapi: {
         url: 'https://example.com'
+    },
+    mongodb: {
+        url: 'mongodb://localhost/marketplace'
     }
+}
+
+if (args.h || args.help) {
+    // TODO: print USAGE
+    console.log("Usage: node " + __filename + " --config");
+    process.exit(-1);
 }
 
 // overwrite default config with config file
@@ -36,8 +47,24 @@ let configFile = args.c || args.config || defaultConfigFile;
 config = iniParser.init(config, configFile);
 config.log.level = args.logLevel || config.log.level;
 
-/** Initalise logging*/
-logging.init(config.log)
+/** Initalise logging library*/
+logging.init({
+    path: config.log.path,
+    level: config.log.level
+})
+
+// Initialize MongoDB database
+mongo.init(config.mongodb)
+mongo.ping( (err, res) => {
+    if (err) return logging.error(err.stack)
+
+    if ( ! res.ok)
+    return logging.error(`[MONGO] CONNECTION NOT ESTABLISHED. Ping Command not returned OK`)
+
+    logging.debug(`[MONGO] CONNECTION ESTABLISHED`)
+})
+
+logging.info(`[CONFIG] ${JSON.stringify(iniParser.get())}`)
 
 /* print CONFIG */
 logging.info(`[APP][FLIPAPI][CONFIG] ${JSON.stringify(config)}`)

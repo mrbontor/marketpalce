@@ -4,6 +4,7 @@ const iniParser = require('../libs/iniParser')
 const logging = require('../libs/logging')
 const util = require('../libs/utils')
 const api = require('./flipApi')
+const db = require('./mongoController')
 
 const createDisbursement = JSON.parse(fs.readFileSync('./schemas/create_disbursement.json'))
 
@@ -27,20 +28,48 @@ async function create_disbursement(req, res) {
         let _request = req.body
         logging.debug(`[PAYLOAD] >>>> ${JSON.stringify(_request)}`)
 
+        //validate user request
         let isRequestValid = await createRequestDisburse(_request)
         logging.debug(`[isRequestValid] >>>> TRUE =>FALSE || FALSE => TRUE ${JSON.stringify(isRequestValid)}`)
 
         if (isRequestValid.message){
             respons.errors = isRequestValid.message.message
-            return res.status(SUCCESS).send(respons);
+            return res.status(BAD_REQUEST).send(respons);
         }
 
+        //check if user exist
+        let isUserExist = await checkUser(_request.username)
+        logging.debug(`[userData] >>>> ${JSON.stringify(isUserExist)}`)
+        if(!isUserExist) {
+            respons.message = 'User not found'
+            return res.status(NOT_FOUND).send(respons);
+        }
+
+        //check if transaction exist
+        let isTrxExist = await checkTrx(_request.uuid)
+        logging.debug(`[userTransaction] >>>> ${JSON.stringify(isTrxExist)}`)
+        if(isTrxExist) {
+            respons.message = 'Transaction is exist, please try again again in a few minutes'
+            return res.status(202).send(respons);
+        }
+
+        //ensure data amount is number/integer/etc
         _request.data.transaction.amount = parseInt(_request.data.transaction.amount)
-        let transfer = await api.transfer(_request.data.transaction)        
+        let transfer = await api.transfer(_request.data.transaction)
 
         if (transfer.errors) {
             respons.errors = transfer.errors
             return res.status(BAD_REQUEST).send(respons);
+        }
+
+        let dataStore = schema_transaction(_request, transfer)
+
+        //store request transaction to db mongodb
+        let storeTrx = await db.saveData(config.mongodb.collection_transactions, dataStore)
+        logging.debug(`[saveDataStrukToMongo] >>>> ${JSON.stringify(storeTrx)}`)
+        if (undefined !== storeTrx.id) {
+            response.message = 'Something went wrong, please try again in a few minutes'
+            return res.status(202).send(respons);
         }
 
         respons = {
@@ -52,6 +81,21 @@ async function create_disbursement(req, res) {
     } catch (e) {
         logging.debug(`[create_disbursement][Err]   >>>>> ${e.stack}`)
         res.status(INTERNAL_ERROR).send(respons)
+    }
+}
+
+function schema_transaction(_req, _res) {
+    let request = {
+        created_at: util.formatDateStandard(new Date(), true),
+        data: _req.data.transaction
+    }
+    let response = _res
+    response.id = "" + _res.id
+    return {
+        _id: _req.uuid,
+        username: _req.username,
+        request: request,
+        response: response
     }
 }
 
@@ -97,6 +141,31 @@ async function createRequestDisburse(request) {
     return Promise.resolve(result);
 }
 
+async function checkUser(username) {
+    try {
+        let getUser = await db.findData(config.mongodb.collection_users, {username: username})
+        if (getUser.length === 0) {
+            return false;
+        }
+        return getUser[0];
+
+    } catch (e) {
+        throw (false)
+    }
+}
+
+async function checkTrx(uid) {
+    try {
+        let getTrx = await db.findData(config.mongodb.collection_transactions, {_id: uid})
+        if (getTrx.length === 0) {
+            return false;
+        }
+        return getTrx[0];
+
+    } catch (e) {
+        throw (false)
+    }
+}
 
 module.exports = {
     create_disbursement,
