@@ -5,6 +5,7 @@ const logging = require('../libs/logging')
 const util = require('../libs/utils')
 const api = require('./flipApi')
 const db = require('./mongoController')
+const pusher = require('../libs/MQService')
 
 const createDisbursement = JSON.parse(fs.readFileSync('./schemas/create_disbursement.json'))
 
@@ -66,10 +67,18 @@ async function create_disbursement(req, res) {
 
         //store request transaction to db mongodb
         let storeTrx = await db.saveData(config.mongodb.collection_transactions, dataStore)
-        logging.debug(`[saveDataStrukToMongo] >>>> ${JSON.stringify(storeTrx)}`)
-        if (undefined !== storeTrx.id) {
-            response.message = 'Something went wrong, please try again in a few minutes'
+        logging.debug(`[saveDataTrx] >>>> ${JSON.stringify(storeTrx)}`)
+        if (!storeTrx._id) {
+            respons.message = 'Something went wrong, please try again in a few minutes'
             return res.status(202).send(respons);
+        }
+
+        //trigger worker to check status transaction
+        try {
+            sendToQueueTrx(storeTrx._id)
+
+        } catch (e) {
+            logging.debug(`[sendToQueueTrx] >>>> ${JSON.stringify(e.stack)}`)
         }
 
         respons = {
@@ -79,7 +88,7 @@ async function create_disbursement(req, res) {
         }
         res.status(SUCCESS).send(respons)
     } catch (e) {
-        logging.debug(`[create_disbursement][Err]   >>>>> ${e.stack}`)
+        logging.debug(`[createDisbursement][Err]   >>>>> ${e.stack}`)
         res.status(INTERNAL_ERROR).send(respons)
     }
 }
@@ -165,6 +174,11 @@ async function checkTrx(uid) {
     } catch (e) {
         throw (false)
     }
+}
+
+function sendToQueueTrx(id) {
+    let dataQueueTrx = {id: id}
+    pusher(config.queue.host, config.queue.queName, dataQueueTrx)
 }
 
 module.exports = {
