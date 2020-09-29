@@ -1,4 +1,6 @@
+## Marketplace worker
 ### FLIP API ID
+
 
 Story: a user want to withdraw his/her money from an online marketplace
 
@@ -80,6 +82,15 @@ interval = 5000
 [queue]
 host                = amqp://guest:guest@localhost:5672
 queName             = trx_worker_dev
+```
+
+### Deployment
+
+This app has `Dockerfile` to deploy it in docker system. Build image and run it as a container:
+
+```sh
+docker build --tag marketplace
+docker run --rm marketplace
 ```
 
 ### API AND URI
