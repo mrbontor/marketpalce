@@ -18,11 +18,20 @@ const ajv = new Ajv({
 
 
 const SUCCESS           = 200
+const SUCCESS_BUT       = 202 // request's was accepted but may have an issue
 const BAD_REQUEST       = 400
 const UNAUTHORIZED      = 401
 const NOT_FOUND         = 404
 const INTERNAL_ERROR    = 500
 
+/*
+ * [create_disbursement description]
+ * this is a transfer function
+ *
+ * @param  {[type]} req [request]
+ * @param  {[type]} res [response]
+ * @return {[type]}     [object]
+ */
 async function create_disbursement(req, res) {
     let respons = {status: false, message: "Failed"}
     try {
@@ -51,7 +60,15 @@ async function create_disbursement(req, res) {
         logging.debug(`[userTransaction] >>>> ${JSON.stringify(isTrxExist)}`)
         if(isTrxExist) {
             respons.message = 'Transaction is exist, please try again again in a few minutes'
-            return res.status(202).send(respons);
+            return res.status(SUCCESS_BUT).send(respons);
+        }
+
+        //check balance users
+        let userBalance = await getUserSaldo(isUserExist._id)
+        logging.debug(`[userTransaction] >>>> ${JSON.stringify(userBalance)}`)
+        if(null === userBalance.saldo || userBalance.saldo < parseInt(_request.data.transaction.amount)) {
+            respons.message = 'Insufisien balance'
+            return res.status(BAD_REQUEST).send(respons);
         }
 
         //ensure data amount is number/integer/etc
@@ -64,51 +81,104 @@ async function create_disbursement(req, res) {
             return res.status(BAD_REQUEST).send(respons);
         }
 
-        let dataStore = schema_transaction(_request, transfer)
+        //prepare data before inserted
+        _request.user_id = isUserExist._id
+        delete _request.username
+        let dataTrxFlip = schema_transaction_flip(_request, transfer)
+        let dataTrxDetail = schema_transaction(_request, transfer, userBalance.saldo)
 
         //store request transaction to db mongodb
-        let storeTrx = await db.saveData(config.mongodb.collection_transactions, dataStore)
+        let storeTrx = await db.saveData(config.mongodb.collection_transactions_flip, dataTrxFlip)
         logging.debug(`[saveDataTrx] >>>> ${JSON.stringify(storeTrx)}`)
         if (!storeTrx._id) {
             respons.message = 'Something went wrong, please try again in a few minutes'
-            return res.status(202).send(respons);
+            return res.status(SUCCESS_BUT).send(respons);
         }
 
         //trigger worker to check status transaction
         try {
-            sendToQueueTrx(storeTrx._id, transfer.id)
-
+            sendToQueueTrx(storeTrx._id, transfer.id, isUserExist._id)
         } catch (e) {
             logging.debug(`[sendToQueueTrx] >>>> ${JSON.stringify(e.stack)}`)
         }
 
+        //all data has validated and checked, it time to go
         respons = {
             status: true,
             message: "Success",
             data: transfer
         }
         res.status(SUCCESS).send(respons)
+        await db.saveData(config.mongodb.collection_transactions, dataTrxDetail)
     } catch (e) {
         logging.debug(`[createDisbursement][Err]   >>>>> ${e.stack}`)
         res.status(INTERNAL_ERROR).send(respons)
     }
 }
 
-function schema_transaction(_req, _res) {
-    let request = {
-        data: _req.data.transaction
-    }
+/*
+ * [schema_transaction_flip description]
+ * formating data transaction from flip into database
+ *
+ * @param  {[type]} _req [obejct]
+ * @param  {[type]} _res [obejct]
+ * @return {[type]}      [obejct]
+ */
+function schema_transaction_flip(_req, _res) {
+    let request = _req.data.transaction
     let response = _res
+
     response.id = "" + _res.id
     return {
         _id: _req.uuid,
-        username: _req.username,
+        user_id: _req.user_id,
         request: request,
         response: response,
         created_at: util.formatDateStandard(new Date(), true),
     }
 }
 
+/*
+ * [schema_transaction description]
+ * formating data transaction into database
+ * if user want to make transaction dinamicly
+ * else user also can monitoring his/her balance change
+ *
+ * @param  {[type]} _req [object]
+ * @param  {[type]} _res [object]
+ * @return {[type]}      [object]
+ */
+function schema_transaction(_req, _res, saldo) {
+    let request = _req.data.transaction
+    let response = _res
+
+    response.id = "" + _res.id
+    return {
+        // _id: _req.uuid,
+        user_id: _req.user_id,
+        type: 'tranfer_fund', //Initialize product marketplace, flip fund
+        request_user: request,
+        response_vendor: response,
+        status: 'PENDING', //though user want to do refund or Something else
+        current_saldo: saldo,
+        bill_amount: _req.data.transaction.amount,
+        fee: 0,
+        total_bill: 0,
+        reff: '', //users may need number vendor's refence, but ...
+        trx_vendor: _req.uuid,
+        created_at: util.formatDateStandard(new Date(), true),
+    }
+}
+
+
+/*
+ * [get_detail_disbursement description]
+ * get detail transaction from flip server
+ *
+ * @param  {[type]} req [request]
+ * @param  {[type]} res [response]
+ * @return {[type]}     [object]
+ */
 async function get_detail_disbursement(req, res) {
     let respons = {status: false, message: "Failed"}
     try {
@@ -139,6 +209,13 @@ async function get_detail_disbursement(req, res) {
     }
 }
 
+/*
+ * [createRequestDisburse description]
+ * function to validate user request to create disbursement
+ *
+ * @param  {[type]} request [object]
+ * @return {[type]}         [array]
+ */
 async function createRequestDisburse(request) {
     let result = {}
     let valid = ajv.validate(createDisbursement, request);
@@ -151,6 +228,13 @@ async function createRequestDisburse(request) {
     return Promise.resolve(result);
 }
 
+/*
+ * [checkUser description]
+ * check user is exist
+ *
+ * @param  {[type]} username [string]
+ * @return {[type]}          [object]
+ */
 async function checkUser(username) {
     try {
         let getUser = await db.findData(config.mongodb.collection_users, {username: username})
@@ -164,9 +248,16 @@ async function checkUser(username) {
     }
 }
 
+/*
+ * [checkTrx description]
+ * check transaction is exist / processing
+ *
+ * @param  {[type]} uid [uuid]
+ * @return {[type]}     [object]
+ */
 async function checkTrx(uid) {
     try {
-        let getTrx = await db.findData(config.mongodb.collection_transactions, {_id: uid})
+        let getTrx = await db.findData(config.mongodb.collection_transactions_flip, {_id: uid})
         if (getTrx.length === 0) {
             return false;
         }
@@ -177,10 +268,50 @@ async function checkTrx(uid) {
     }
 }
 
-function sendToQueueTrx(id, trx_id) {
+/*
+ * [getUserSaldo description]
+ * get data user dan user's saldo
+ *
+ * @param  {[type]} user_id [obejctId]
+ * @return {[type]}         [object]
+ */
+async function getUserSaldo(user_id) {
+    let docs = [
+        {$match: {user_id: require('mongodb').ObjectId(user_id)}},
+        {
+            $lookup: {
+                from: config.mongodb.collection_users,
+                localField: "user_id",
+                foreignField: "_id",
+                as: "user_id"
+            }
+        },
+        {
+            $unwind: '$user_id'
+        }
+    ]
+
+    let result = await db.findAgg(config.mongodb.collection_users_saldo, docs)
+
+    logging.debug(`[userInfo&Saldo] >>>> ${JSON.stringify(result)}`)
+    if (result.length > 0) return result[0];
+    return null;
+}
+
+/*
+ * [sendToQueueTrx description]
+ * processing data transaction into queue
+ *
+ * @param  {[type]} id      [uuid]
+ * @param  {[type]} trx_id  [number]
+ * @param  {[type]} user_id [ObjectId]
+ * @return {[type]}         [string]
+ */
+function sendToQueueTrx(id, trx_id, user_id) {
     let dataQueueTrx = {
         id: id,
-        trx_id: trx_id
+        trx_id: trx_id,
+        user_id: user_id
     }
     pusher(config.queue.host, config.queue.queName, dataQueueTrx)
 }

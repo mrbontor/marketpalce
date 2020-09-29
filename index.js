@@ -4,10 +4,10 @@ const uuid = require('uuid').v4
 const iniParser = require('./libs/iniParser')
 const logging = require('./libs/logging')
 const args = require('minimist')(process.argv.slice(2));
+const mongo = require('./libs/mongo')
 const bodyParser = require('body-parser')
 const app = express()
 
-const mongo = require('./libs/mongo')
 
 const NODE_ENV = process.env.NODE_ENV
 process.env.TZ = 'Asia/Jakarta'
@@ -16,20 +16,7 @@ process.env.TZ = 'Asia/Jakarta'
 let config = {
     log: {
         path: 'var/log/',
-        level: 'debug',
-        type: 'file',
-        errorSufix: '-error',
-        filename: 'logFlipApi'
-    },
-    app: {
-        host: '127.0.0.1',
-        port: 80
-    },
-    flipapi: {
-        url: 'https://example.com'
-    },
-    mongodb: {
-        url: 'mongodb://localhost/marketplace'
+        level: 'debug'
     }
 }
 
@@ -40,7 +27,7 @@ if (args.h || args.help) {
 }
 
 // overwrite default config with config file
-const defaultConfigFile = ('production' === NODE_ENV) ? './configs/config.flip.api.prod.ini' : './configs/config.flip.api.dev.ini'
+const defaultConfigFile = ('production' === NODE_ENV) ? args.c || args.config || './configs/config.flip.api.prod.ini' : args.c || args.config || './configs/config.flip.api.dev.ini'
 
 /* Initialise Config */
 let configFile = args.c || args.config || defaultConfigFile;
@@ -93,8 +80,8 @@ app.use(function (req, res, next) {
 
     if (undefined === req.body.uuid) req.body.uuid = uuid()
 
-    logging.http(`[IN][REQUEST] [${req.body.uuid}] ${dataReq}`);
-    logging.http(`[IN][REQUEST][BODY] [${req.body.uuid}] ${JSON.stringify(req.body)}`);
+    logging.info(`[IN][REQUEST] [${req.body.uuid}] ${dataReq}`);
+    logging.info(`[IN][REQUEST][BODY] [${req.body.uuid}] ${JSON.stringify(req.body)}`);
     next();
 });
 

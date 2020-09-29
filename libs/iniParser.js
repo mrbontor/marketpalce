@@ -1,31 +1,62 @@
+'use strict'
+
 const fs = require('fs');
 const ini = require('ini');
 
+const NODE_ENV = process.env.NODE_ENV
+
 class Configs {
-    config
+	init(defaultConfig = null, configDir = null) {
+		this.config = {}
+		let defaultDir = ('production' === NODE_ENV) ? configDir || './configs/config.flip.api.prod.ini' : configDir || './configs/config.flip.api.dev.ini'
 
-    init(defaultConfig = null, configDir = null) {
-        this.config = ini.parse(fs.readFileSync(configDir, 'utf-8'));
-        this.copyInto(defaultConfig, this.config);
-        this.config = defaultConfig;
-        return defaultConfig || {};
-    }
+		this.config = ini.parse(fs.readFileSync(defaultDir, 'utf-8'))
+		this.copyInto(defaultConfig, this.config)
+		this.config = defaultConfig
+		return defaultConfig || {}
+	}
 
-    copyInto(oldConfig, newConfig) {
-        for (let key in newConfig) {
-            if (!newConfig.hasOwnProperty(key)) continue
-            if ('object' === typeof (newConfig[key])) {
-                oldConfig[key] = oldConfig[key] || {};
-                this.copyInto(oldConfig[key], newConfig[key]);
-                continue;
-            }
-            oldConfig[key] = newConfig[key];
-        }
-    }
+	copyInto(oldConfig,newConfig) {
+		for (let key in newConfig) {
+			if ( ! newConfig.hasOwnProperty(key)) continue
+			if ('object' === typeof(newConfig[key])) {
+				oldConfig[key] = oldConfig[key] || {}
+				copyInto(oldConfig[key], newConfig[key])
+				continue
+			}
+			oldConfig[key] = newConfig[key]
+		}
+	}
 
-    get() {
-        return this.config;
-    }
+	get() {
+		return this.config
+	}
 }
 
-module.exports = new Configs();
+// var key
+function copyInto(oldConfig,newConfig) {
+	for (let key in newConfig) {
+		if ( ! newConfig.hasOwnProperty(key)) continue
+		if ('object' === typeof(newConfig[key])) {
+			oldConfig[key] = oldConfig[key] || {}
+			copyInto(oldConfig[key], newConfig[key])
+			continue
+		}
+		oldConfig[key] = newConfig[key]
+	}
+}
+
+let init = function(defaultConfig = null, configDir = null){
+	defaultDir = configDir || defaultDir
+	config = ini.parse(fs.readFileSync(defaultDir, 'utf-8'))
+	copyInto(defaultConfig, config)
+	config = defaultConfig
+	console.log('config initialized');
+	return defaultConfig || {}
+}
+
+function getConf() {
+	return this.config
+}
+
+module.exports = new Configs()

@@ -8,7 +8,7 @@ const URL_DISBURSEMENT   = 'disburse';
 const URL_CHECK_STATUS   = 'disburse/';
 
 let key = Buffer.from(config.flipapi.sc + ':').toString('base64');
-console.log('key', key);
+
 const req_header = {
     'follow_max': 5,
     'Content-Type': 'application/x-www-form-urlencoded',
