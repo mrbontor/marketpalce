@@ -64,7 +64,7 @@ async function create_disbursement(req, res) {
         }
 
         //check balance users
-        let userBalance = await getUserSaldo(isUserExist._id)
+        let userBalance = await getUserSaldoById(isUserExist._id)
         logging.debug(`[userTransaction] >>>> ${JSON.stringify(userBalance)}`)
         if(null === userBalance.saldo || userBalance.saldo < parseInt(_request.data.transaction.amount)) {
             respons.message = 'Insufisien balance'
@@ -269,13 +269,13 @@ async function checkTrx(uid) {
 }
 
 /*
- * [getUserSaldo description]
+ * [getUserSaldoById description]
  * get data user dan user's saldo
  *
  * @param  {[type]} user_id [obejctId]
  * @return {[type]}         [object]
  */
-async function getUserSaldo(user_id) {
+async function getUserSaldoById(user_id) {
     let docs = [
         {$match: {user_id: require('mongodb').ObjectId(user_id)}},
         {
@@ -292,6 +292,29 @@ async function getUserSaldo(user_id) {
     ]
 
     let result = await db.findAgg(config.mongodb.collection_users_saldo, docs)
+
+    logging.debug(`[userInfo&Saldo] >>>> ${JSON.stringify(result)}`)
+    if (result.length > 0) return result[0];
+    return null;
+}
+
+async function getUserByUsername(username) {
+    let docs = [
+        {$match: {username: username}},
+        {
+            $lookup: {
+                from: config.mongodb.collection_users_saldo,
+                localField: "_id",
+                foreignField: "user_id",
+                as: "saldo"
+            }
+        },
+        {
+            $unwind: '$saldo'
+        }
+    ]
+
+    let result = await db.findAgg(config.mongodb.collection_users, docs)
 
     logging.debug(`[userInfo&Saldo] >>>> ${JSON.stringify(result)}`)
     if (result.length > 0) return result[0];
@@ -316,7 +339,75 @@ function sendToQueueTrx(id, trx_id, user_id) {
     pusher(config.queue.host, config.queue.queName, dataQueueTrx)
 }
 
+async function get_info_user(req, res) {
+    let respons = {status: false, message: "Data not found"}
+    try {
+        let _request = req.params
+        logging.debug(`[PAYLOAD] >>>> ${JSON.stringify(_request)}`)
+
+        if (!_request.username) {
+            respons.message = 'User not found'
+            return res.status(NOT_FOUND).send(respons)
+        }
+
+        let detail = await getUserByUsername(_request.username)
+
+        if (null === detail) {
+            respons.message = 'User not found'
+            return res.status(NOT_FOUND).send(respons);
+        }
+
+        respons = {
+            status: true,
+            message: "Success",
+            data: detail
+        }
+        res.status(SUCCESS).send(respons)
+    } catch (e) {
+        logging.debug(`[get_info_user]   >>>>> ${e.stack}`)
+        res.status(INTERNAL_ERROR).send(respons)
+    }
+}
+
+async function get_history_trx(req, res) {
+    let respons = {status: false, message: "Data not found"}
+    try {
+        let _request = req.params
+        logging.debug(`[PAYLOAD] >>>> ${JSON.stringify(_request)}`)
+
+        if (!_request.username) {
+            respons.message = 'Data not found'
+            return res.status(NOT_FOUND).send(respons)
+        }
+
+        //check if user exist
+        let isUserExist = await checkUser(_request.username)
+        logging.debug(`[userData] >>>> ${JSON.stringify(isUserExist)}`)
+        if(!isUserExist) {
+            respons.message = 'User not found'
+            return res.status(NOT_FOUND).send(respons);
+        }
+
+        let getTrx = await db.findData(config.mongodb.collection_transactions, {user_id: isUserExist._id})
+        if (getTrx.length === 0) {
+            return respons;
+        }
+
+        respons = {
+            status: true,
+            message: "Success",
+            data: getTrx
+        }
+        res.status(SUCCESS).send(respons)
+    } catch (e) {
+        logging.debug(`[get_info_user]   >>>>> ${e.stack}`)
+        res.status(INTERNAL_ERROR).send(respons)
+    }
+}
+
 module.exports = {
     create_disbursement,
-    get_detail_disbursement
+    get_detail_disbursement,
+    get_info_user,
+    get_history_trx
 };
