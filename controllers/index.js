@@ -56,6 +56,7 @@ async function create_disbursement(req, res) {
 
         //ensure data amount is number/integer/etc
         _request.data.transaction.amount = parseInt(_request.data.transaction.amount)
+        //request transfer
         let transfer = await api.transfer(_request.data.transaction)
 
         if (transfer.errors) {
@@ -75,7 +76,7 @@ async function create_disbursement(req, res) {
 
         //trigger worker to check status transaction
         try {
-            sendToQueueTrx(storeTrx._id)
+            sendToQueueTrx(storeTrx._id, transfer.id)
 
         } catch (e) {
             logging.debug(`[sendToQueueTrx] >>>> ${JSON.stringify(e.stack)}`)
@@ -95,7 +96,6 @@ async function create_disbursement(req, res) {
 
 function schema_transaction(_req, _res) {
     let request = {
-        created_at: util.formatDateStandard(new Date(), true),
         data: _req.data.transaction
     }
     let response = _res
@@ -104,7 +104,8 @@ function schema_transaction(_req, _res) {
         _id: _req.uuid,
         username: _req.username,
         request: request,
-        response: response
+        response: response,
+        created_at: util.formatDateStandard(new Date(), true),
     }
 }
 
@@ -176,8 +177,11 @@ async function checkTrx(uid) {
     }
 }
 
-function sendToQueueTrx(id) {
-    let dataQueueTrx = {id: id}
+function sendToQueueTrx(id, trx_id) {
+    let dataQueueTrx = {
+        id: id,
+        trx_id: trx_id
+    }
     pusher(config.queue.host, config.queue.queName, dataQueueTrx)
 }
 
