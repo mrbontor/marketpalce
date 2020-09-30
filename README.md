@@ -1,4 +1,6 @@
+## Marketplace worker
 ### FLIP API ID
+
 
 Story: a user want to withdraw his/her money from an online marketplace
 
@@ -18,6 +20,22 @@ by our case, i make 2 services to handle it. this is not microservices, but i ca
 * *marketplace_worker* => is to handling user's transaction status and update saldo
 
 those services should be running together.
+
+### Schema
+
+there are 4 collections/tables;
+
+- users
+- users_saldo
+- transactions
+- transactions_flip
+
+below is the flow of collections design;
+
+                `users_saldo`   -->                 <--     `transactions`
+                                        `user`                    |
+                                                    <--      `transactions_flip`
+
 
 ### Prerequisites
 
@@ -80,6 +98,15 @@ interval = 5000
 [queue]
 host                = amqp://guest:guest@localhost:5672
 queName             = trx_worker_dev
+```
+
+### Deployment
+
+This app has `Dockerfile` to deploy it in docker system. Build image and run it as a container:
+
+```sh
+docker build --tag marketplace
+docker run --rm marketplace
 ```
 
 ### API AND URI
