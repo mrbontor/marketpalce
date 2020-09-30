@@ -21,6 +21,22 @@ by our case, i make 2 services to handle it. this is not microservices, but i ca
 
 those services should be running together.
 
+### Schema
+
+there are 4 collections/tables;
+
+- users
+- users_saldo
+- transactions
+- transactions_flip
+
+below is the flow of collections design;
+
+                `users_saldo`   -->                 <--     `transactions`
+                                        `user`                    |
+                                                    <--      `transactions_flip`
+
+
 ### Prerequisites
 
 What things you need to install the software and how to install them
